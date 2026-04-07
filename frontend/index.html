@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inteligência de Mercado</title>
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f5f5; --surface: #fff; --border: #e0e0e0;
+    --text: #1a1a1a; --muted: #666; --accent: #2563eb;
+    --danger: #dc2626; --success: #16a34a;
+  }
+  body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+
+  /* NAV */
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 20px; display: flex; align-items: center; gap: 24px; height: 52px; flex-shrink: 0; }
+  nav h1 { font-size: 15px; font-weight: 600; }
+  nav a { font-size: 13px; color: var(--muted); text-decoration: none; padding: 4px 0; border-bottom: 2px solid transparent; cursor: pointer; }
+  nav a.active, nav a:hover { color: var(--accent); border-color: var(--accent); }
+  nav .spacer { flex: 1; }
+  nav button { font-size: 13px; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+
+  /* PAGES */
+  .page { display: none; flex: 1; overflow: hidden; }
+  .page.active { display: flex; }
+
+  /* MAP PAGE */
+  #map-page { position: relative; }
+  #map { flex: 1; height: 100%; }
+
+  /* SIDEBAR */
+  #sidebar {
+    width: 300px; flex-shrink: 0; background: var(--surface);
+    border-left: 1px solid var(--border); padding: 20px;
+    overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+    transform: translateX(100%); position: absolute; right: 0; top: 0; bottom: 0;
+    transition: transform .25s ease; z-index: 10;
+  }
+  #sidebar.open { transform: translateX(0); }
+  #sidebar h2 { font-size: 16px; font-weight: 600; }
+  #sidebar .close-btn { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 18px; cursor: pointer; color: var(--muted); }
+  .stat-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .label { color: var(--muted); }
+  .stat-row .value { font-weight: 500; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: #dbeafe; color: #1d4ed8; font-weight: 500; }
+
+  /* BRANCHES LIST PAGE */
+  #list-page { flex-direction: column; padding: 24px; overflow-y: auto; }
+  .list-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .list-header h2 { font-size: 16px; font-weight: 600; flex: 1; }
+  .list-header select, .list-header input { font-size: 13px; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; background: var(--surface); }
+  .list-header button { font-size: 13px; background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+  th { background: var(--bg); font-weight: 500; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+
+  .actions { display: flex; gap: 6px; }
+  .btn-sm { font-size: 12px; padding: 3px 10px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; }
+  .btn-sm.danger { color: var(--danger); border-color: #fca5a5; }
+  .btn-sm.danger:hover { background: #fef2f2; }
+
+  .pagination { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .pagination button { font-size: 13px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; }
+  .pagination button:disabled { opacity: .4; cursor: default; }
+
+  /* LOGIN PAGE */
+  #login-page { flex-direction: column; align-items: center; justify-content: center; }
+  .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; width: 340px; display: flex; flex-direction: column; gap: 14px; }
+  .login-card h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .login-card label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .login-card input { width: 100%; font-size: 14px; border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; outline: none; }
+  .login-card input:focus { border-color: var(--accent); }
+  .login-card .submit { background: var(--accent); color: #fff; border: none; border-radius: 7px; padding: 10px; font-size: 14px; cursor: pointer; font-weight: 500; }
+  .login-card .submit:hover { background: #1d4ed8; }
+  .login-card .err { font-size: 13px; color: var(--danger); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: var(--surface); border-radius: 12px; padding: 24px; width: 380px; display: flex; flex-direction: column; gap: 14px; }
+  .modal h3 { font-size: 16px; font-weight: 600; }
+  .modal label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .modal input, .modal select { width: 100%; font-size: 14px; border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; }
+  .modal .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+  .modal-actions button { font-size: 13px; padding: 7px 16px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; }
+  .modal-actions .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .field-err { font-size: 11px; color: var(--danger); margin-top: 2px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<nav id="nav" class="hidden">
+  <h1>📍 Inteligência de Mercado</h1>
+  <a id="nav-map" class="active" onclick="showPage('map')">Mapa</a>
+  <a id="nav-list" onclick="showPage('list')">Filiais</a>
+  <span class="spacer"></span>
+  <button onclick="logout()">Sair</button>
+</nav>
+
+<!-- LOGIN -->
+<div id="login-page" class="page active">
+  <div class="login-card">
+    <h2>Entrar</h2>
+    <div>
+      <label>E-mail</label>
+      <input id="login-email" type="email" value="admin@empresa.com">
+    </div>
+    <div>
+      <label>Senha</label>
+      <input id="login-pass" type="password" value="admin123">
+    </div>
+    <div id="login-err" class="err hidden"></div>
+    <button class="submit" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- MAP -->
+<div id="map-page" class="page">
+  <div id="map"></div>
+  <div id="tooltip" style="position:absolute;pointer-events:none;background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:6px 10px;font-size:12px;display:none;"></div>
+  <div id="sidebar">
+    <button class="close-btn" onclick="closeSidebar()">✕</button>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <h2 id="sb-nome"></h2>
+      <span class="badge" id="sb-regiao"></span>
+    </div>
+    <div class="stat-row"><span class="label">Capital</span><span class="value" id="sb-capital"></span></div>
+    <div class="stat-row"><span class="label">População</span><span class="value" id="sb-pop"></span></div>
+    <div class="stat-row"><span class="label">PIB per capita</span><span class="value" id="sb-pib"></span></div>
+    <div class="stat-row"><span class="label">Filiais ativas</span><span class="value" id="sb-filiais"></span></div>
+  </div>
+</div>
+
+<!-- LIST -->
+<div id="list-page" class="page">
+  <div class="list-header">
+    <h2>Filiais</h2>
+    <select id="filter-uf" onchange="loadBranches(1)">
+      <option value="">Todos os estados</option>
+    </select>
+    <button onclick="openModal(null)">+ Nova filial</button>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Nome</th><th>Cidade</th><th>UF</th><th>Abertura</th><th></th>
+    </tr></thead>
+    <tbody id="branch-tbody"></tbody>
+  </table>
+  <div class="pagination">
+    <button id="prev-btn" onclick="loadBranches(currentPage-1)">← Anterior</button>
+    <span id="page-info"></span>
+    <button id="next-btn" onclick="loadBranches(currentPage+1)">Próxima →</button>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3 id="modal-title">Nova filial</h3>
+    <div>
+      <label>Nome *</label>
+      <input id="f-nome" type="text">
+      <div class="field-err hidden" id="err-nome"></div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Cidade *</label>
+        <input id="f-cidade" type="text">
+        <div class="field-err hidden" id="err-cidade"></div>
+      </div>
+      <div>
+        <label>UF *</label>
+        <select id="f-uf"></select>
+        <div class="field-err hidden" id="err-uf"></div>
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Lat</label>
+        <input id="f-lat" type="number" step="0.000001" placeholder="-23.55">
+      </div>
+      <div>
+        <label>Lng</label>
+        <input id="f-lng" type="number" step="0.000001" placeholder="-46.63">
+      </div>
+    </div>
+    <div>
+      <label>Data de abertura *</label>
+      <input id="f-opened" type="date">
+      <div class="field-err hidden" id="err-opened_at"></div>
+    </div>
+    <div class="modal-actions">
+      <button onclick="closeModal()">Cancelar</button>
+      <button class="primary" onclick="saveBranch()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8080';
+let token = null;
+let currentPage = 1;
+let totalPages = 1;
+let editingId = null;
+let map, statesSource, branchMarkers = [], hoveredId = null, selectedId = null;
+let statesData = [];
+
+// ===================== AUTH =====================
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const pass  = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-err');
+  errEl.classList.add('hidden');
+  try {
+    const res = await fetch(`${API}/auth/login`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email, password: pass})
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error || 'Erro ao autenticar'; errEl.classList.remove('hidden'); return; }
+    token = data.token;
+    showApp();
+  } catch { errEl.textContent = 'Não foi possível conectar ao servidor.'; errEl.classList.remove('hidden'); }
+}
+
+function logout() { token = null; showPage('login'); }
+
+// ===================== NAVIGATION =====================
+
+function showApp() {
+  document.getElementById('nav').classList.remove('hidden');
+  showPage('map');
+  initMap();
+  populateUFSelects();
+}
+
+function showPage(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(el => el.classList.remove('active'));
+  if (p === 'login') {
+    document.getElementById('login-page').classList.add('active');
+    document.getElementById('nav').classList.add('hidden');
+    return;
+  }
+  document.getElementById(`${p}-page`).classList.add('active');
+  document.getElementById(`nav-${p}`)?.classList.add('active');
+  if (p === 'list') loadBranches(1);
+  if (p === 'map' && map) setTimeout(() => map.resize(), 50);
+}
+
+// ===================== MAP =====================
+
+async function initMap() {
+  if (map) return;
+  map = new maplibregl.Map({
+    container: 'map',
+    style: { version:8, sources:{}, layers:[{id:'bg',type:'background',paint:{'background-color':'#e8edf2'}}] },
+    center: [-52, -14], zoom: 3.2, minZoom: 2, maxZoom: 10,
+    attributionControl: false
+  });
+  map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-left');
+  map.on('load', async () => {
+    const [geoRes, statesRes] = await Promise.all([
+      fetch('https://cdn.jsdelivr.net/gh/codeforamerica/click_that_hood@master/public/data/brazil-states.geojson'),
+      fetch(`${API}/states`)
+    ]);
+    const geojson   = await geoRes.json();
+    statesData      = await statesRes.json();
+    const stateMap  = Object.fromEntries(statesData.map(s => [s.uf, s]));
+
+    const CORES = {'Norte':'#1D9E75','Nordeste':'#D85A30','Centro-Oeste':'#BA7517','Sudeste':'#534AB7','Sul':'#185FA5'};
+
+    geojson.features.forEach((f, i) => {
+      f.id = i + 1;
+      const uf = f.properties.sigla || f.properties.id || f.properties.UF;
+      const s  = stateMap[uf] || {};
+      f.properties._id     = i + 1;
+      f.properties._uf     = uf;
+      f.properties._nome   = s.nome   || uf;
+      f.properties._regiao = s.regiao || '';
+      f.properties._cor    = CORES[s.regiao] || '#888';
+    });
+
+    map.addSource('estados', {type:'geojson', data: geojson, promoteId: '_id'});
+    map.addLayer({id:'estados-fill', type:'fill', source:'estados', paint:{
+      'fill-color': ['get','_cor'],
+      'fill-opacity': ['case',['boolean',['feature-state','hover'],false],1.0,0.45]
+    }});
+    map.addLayer({id:'estados-border', type:'line', source:'estados', paint:{
+      'line-color':'#fff',
+      'line-width':['case',['boolean',['feature-state','hover'],false],2.5,1]
+    }});
+    map.addLayer({id:'estados-selected', type:'fill', source:'estados', paint:{
+      'fill-color':['get','_cor'],
+      'fill-opacity':['case',['boolean',['feature-state','selected'],false],0.9,0]
+    }});
+
+    const tooltip = document.getElementById('tooltip');
+    map.on('mousemove','estados-fill', e => {
+      map.getCanvas().style.cursor = 'pointer';
+      if (hoveredId !== null) map.setFeatureState({source:'estados',id:hoveredId},{hover:false});
+      hoveredId = e.features[0].id;
+      map.setFeatureState({source:'estados',id:hoveredId},{hover:true});
+      const p = e.features[0].properties;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.point.x+14)+'px';
+      tooltip.style.top  = (e.point.y-10)+'px';
+      tooltip.innerHTML  = `<strong>${p._nome}</strong> &nbsp;${p._uf}`;
+    });
+    map.on('mouseleave','estados-fill', () => {
+      map.getCanvas().style.cursor = '';
+      if (hoveredId !== null) map.setFeatureState({source:'estados',id:hoveredId},{hover:false});
+      hoveredId = null;
+      tooltip.style.display = 'none';
+    });
+    map.on('click','estados-fill', e => {
+      if (selectedId !== null) map.setFeatureState({source:'estados',id:selectedId},{selected:false});
+      selectedId = e.features[0].id;
+      map.setFeatureState({source:'estados',id:selectedId},{selected:true});
+      openSidebar(e.features[0].properties._uf);
+    });
+
+    await loadBranchMarkers();
+  });
+}
+
+async function loadBranchMarkers() {
+  branchMarkers.forEach(m => m.remove());
+  branchMarkers = [];
+  const res  = await fetch(`${API}/branches?limit=100`);
+  const data = await res.json();
+  (data.data || []).forEach(b => {
+    if (!b.lat || !b.lng) return;
+    const el = document.createElement('div');
+    el.style.cssText = 'width:14px;height:14px;border-radius:50%;background:#dc2626;border:2.5px solid #fff;cursor:pointer;box-shadow:0 1px 6px rgba(220,38,38,.5)';
+    const popup = new maplibregl.Popup({offset:12,closeButton:false}).setHTML(
+      `<strong>${b.nome}</strong><br>${b.cidade} · ${b.uf}<br><small>Abertura: ${b.opened_at}</small>`
+    );
+    const marker = new maplibregl.Marker({element:el})
+      .setLngLat([b.lng, b.lat])
+      .setPopup(popup)
+      .addTo(map);
+    branchMarkers.push(marker);
+  });
+}
+
+async function openSidebar(uf) {
+  const res  = await fetch(`${API}/states/${uf}`);
+  const s    = await res.json();
+  document.getElementById('sb-nome').textContent    = s.nome;
+  document.getElementById('sb-regiao').textContent  = s.regiao;
+  document.getElementById('sb-capital').textContent = s.capital;
+  document.getElementById('sb-pop').textContent     = s.populacao.toLocaleString('pt-BR');
+  document.getElementById('sb-pib').textContent     = `R$ ${Number(s.pib_per_capita).toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
+  document.getElementById('sb-filiais').textContent = s.filiais_ativas;
+  document.getElementById('sidebar').classList.add('open');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  if (selectedId !== null) { map.setFeatureState({source:'estados',id:selectedId},{selected:false}); selectedId = null; }
+}
+
+// ===================== BRANCHES LIST =====================
+
+async function loadBranches(page) {
+  currentPage = page;
+  const uf    = document.getElementById('filter-uf').value;
+  const limit = 10;
+  const params = new URLSearchParams({page, limit});
+  if (uf) params.set('uf', uf);
+  const res  = await apiFetch(`/branches?${params}`);
+  const data = await res.json();
+  const tbody = document.getElementById('branch-tbody');
+  tbody.innerHTML = '';
+  (data.data || []).forEach(b => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${b.nome}</td><td>${b.cidade}</td><td>${b.uf}</td><td>${b.opened_at}</td>
+      <td><div class="actions">
+        <button class="btn-sm" onclick='openModal(${JSON.stringify(b)})'>Editar</button>
+        <button class="btn-sm danger" onclick="deleteBranch(${b.id})">Remover</button>
+      </div></td>`;
+    tbody.appendChild(tr);
+  });
+  totalPages = Math.max(1, Math.ceil(data.total / limit));
+  document.getElementById('page-info').textContent = `Página ${currentPage} de ${totalPages} · ${data.total} registros`;
+  document.getElementById('prev-btn').disabled = currentPage <= 1;
+  document.getElementById('next-btn').disabled = currentPage >= totalPages;
+}
+
+// ===================== MODAL =====================
+
+function openModal(branch) {
+  editingId = branch ? branch.id : null;
+  document.getElementById('modal-title').textContent = branch ? 'Editar filial' : 'Nova filial';
+  document.getElementById('f-nome').value   = branch?.nome   || '';
+  document.getElementById('f-cidade').value = branch?.cidade || '';
+  document.getElementById('f-uf').value     = branch?.uf     || '';
+  document.getElementById('f-lat').value    = branch?.lat    || '';
+  document.getElementById('f-lng').value    = branch?.lng    || '';
+  document.getElementById('f-opened').value = branch?.opened_at || '';
+  ['nome','cidade','uf','opened_at'].forEach(f => {
+    document.getElementById(`err-${f}`).classList.add('hidden');
+  });
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modal-overlay'))
+    document.getElementById('modal-overlay').classList.add('hidden');
+}
+
+async function saveBranch() {
+  const body = {
+    nome:      document.getElementById('f-nome').value.trim(),
+    cidade:    document.getElementById('f-cidade').value.trim(),
+    uf:        document.getElementById('f-uf').value,
+    opened_at: document.getElementById('f-opened').value,
+    lat: document.getElementById('f-lat').value ? parseFloat(document.getElementById('f-lat').value) : null,
+    lng: document.getElementById('f-lng').value ? parseFloat(document.getElementById('f-lng').value) : null,
+  };
+  const url    = editingId ? `/branches/${editingId}` : '/branches';
+  const method = editingId ? 'PUT' : 'POST';
+  const res    = await apiFetch(url, {method, body: JSON.stringify(body)});
+  const data   = await res.json();
+
+  if (!res.ok) {
+    if (data.fields) {
+      Object.entries(data.fields).forEach(([k,v]) => {
+        const el = document.getElementById(`err-${k}`);
+        if (el) { el.textContent = v; el.classList.remove('hidden'); }
+      });
+    }
+    return;
+  }
+  closeModal();
+  loadBranches(currentPage);
+  if (map) loadBranchMarkers();
+}
+
+async function deleteBranch(id) {
+  if (!confirm('Remover esta filial?')) return;
+  await apiFetch(`/branches/${id}`, {method:'DELETE'});
+  loadBranches(currentPage);
+  if (map) loadBranchMarkers();
+}
+
+// ===================== HELPERS =====================
+
+function apiFetch(path, opts = {}) {
+  return fetch(`${API}${path}`, {
+    ...opts,
+    headers: { 'Content-Type':'application/json', ...(token ? {'Authorization':`Bearer ${token}`} : {}), ...(opts.headers||{}) }
+  });
+}
+
+async function populateUFSelects() {
+  const res  = await fetch(`${API}/states`);
+  const data = await res.json();
+  const ufs  = data.map(s => `<option value="${s.uf}">${s.uf} – ${s.nome}</option>`).join('');
+  document.getElementById('filter-uf').innerHTML += ufs;
+  document.getElementById('f-uf').innerHTML = '<option value="">Selecione</option>' + ufs;
+}
+</script>
+</body>
+</html>
